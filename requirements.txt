@@ -12,4 +12,4 @@ python-multipart
 PyPDF2
 SpeechRecognition
 gTTS
-google-generativeai
+google-genai

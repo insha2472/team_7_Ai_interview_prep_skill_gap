@@ -10,7 +10,7 @@ Provides four capabilities:
 
 import os
 import json
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 from typing import Dict, List, Any
 
@@ -18,14 +18,17 @@ load_dotenv()
 
 # ── Gemini setup ──────────────────────────────────────────────
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-genai.configure(api_key=GEMINI_API_KEY)
+client = genai.Client(api_key=GEMINI_API_KEY)
 
-_model = genai.GenerativeModel("gemini-2.0-flash")
+MODEL_ID = "gemini-2.0-flash"
 
 
 def _ask_gemini_json(prompt: str) -> dict | list:
     """Send a prompt to Gemini and parse the response as JSON."""
-    response = _model.generate_content(prompt)
+    response = client.models.generate_content(
+        model=MODEL_ID,
+        contents=prompt,
+    )
     text = response.text.strip()
 
     # Strip markdown code fences if Gemini wraps JSON in ```json ... ```
@@ -295,23 +298,27 @@ Use simple language. Be encouraging but honest.
 """
 
 # Store per-user chat sessions in memory
-_coach_sessions: dict[str, object] = {}
+_coach_sessions: dict[str, genai.Chat] = {}
 
 
 def get_interview_coach(user_email: str):
     """Return (or create) a Gemini interview coach session for this user."""
     if user_email not in _coach_sessions:
-        _coach_sessions[user_email] = _model.start_chat(
+        _coach_sessions[user_email] = client.chats.create(
+            model=MODEL_ID,
+            config=genai.types.GenerateContentConfig(
+                system_instruction=INTERVIEW_COACH_PROMPT
+            ),
             history=[
-                {"role": "user", "parts": [INTERVIEW_COACH_PROMPT]},
-                {"role": "model", "parts": [
-                    "I'm your AI Interview Coach! I can help you with:\n"
-                    "• Mock interviews (technical & behavioral)\n"
-                    "• Detailed feedback on your answers\n"
-                    "• Learning concepts for your skill gaps\n"
-                    "• Interview tips and career guidance\n\n"
-                    "What would you like to practise today?"
-                ]},
+                genai.types.Content(
+                   role="model",
+                   parts=[genai.types.Part(text="I'm your AI Interview Coach! I can help you with:\n"
+                                               "• Mock interviews (technical & behavioral)\n"
+                                               "• Detailed feedback on your answers\n"
+                                               "• Learning concepts for your skill gaps\n"
+                                               "• Interview tips and career guidance\n\n"
+                                               "What would you like to practise today?")]
+                )
             ]
         )
     return _coach_sessions[user_email]
