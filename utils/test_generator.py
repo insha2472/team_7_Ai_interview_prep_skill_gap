@@ -7,6 +7,6 @@ from typing import Dict, List
 from utils.ai_agent import ai_generate_test
 
 
-def generate_test_questions(skill_name: str, num_questions: int = 5) -> List[Dict]:
-    """Generate interview-style multiple-choice questions for any skill using AI."""
-    return ai_generate_test(skill_name, num_questions)
+def generate_test_questions(skill_name: str, num_questions: int = 5, test_type: str = "mcq") -> List[Dict]:
+    """Generate interview-style questions for any skill using AI."""
+    return ai_generate_test(skill_name, num_questions, test_type)

@@ -58,6 +58,20 @@ def get_roadmap(
         db.commit()
     else:
         roadmap_data = json.loads(existing_roadmap.roadmap_data)
+        
+        # Check if the existing roadmap is missing or has empty flashcards (Legacy/Corrupt format)
+        needs_regen = False
+        if isinstance(roadmap_data, list) and len(roadmap_data) > 0:
+            # If the first week doesn't have flashcards or they are empty, regenerate
+            if "flashcards" not in roadmap_data[0] or not roadmap_data[0]["flashcards"]:
+                needs_regen = True
+        
+        if needs_regen:
+            print(f"[Roadmap Route] Detected legacy/corrupt roadmap for user {current_user.id}. Regenerating with flashcards...")
+            roadmap_data = generate_roadmap(missing_skills)
+            print(f"[Roadmap Route] Generated data: {json.dumps(roadmap_data)[:100]}...") # Debug log
+            existing_roadmap.roadmap_data = json.dumps(roadmap_data)
+            db.commit()
 
     # Fetch projects for this user
     projects = db.query(GeneratedProject).filter(GeneratedProject.user_id == current_user.id).all()

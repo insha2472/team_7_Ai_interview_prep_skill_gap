@@ -11,9 +11,13 @@ from schemas.test_schema import (
     SubmitTestResponse,
     QuestionResult,
     TestResultResponse,
+    SubmitOpenRequest,
+    SubmitOpenResponse,
+    OpenResult
 )
 from utils.jwt_handler import get_current_user
 from utils.test_generator import generate_test_questions
+from utils.ai_agent import ai_grade_open_ended_test
 from utils.streak_logic import add_xp, update_streak, XP_PER_TEST
 
 router = APIRouter(prefix="/test", tags=["Mock Tests"])
@@ -27,17 +31,20 @@ def generate_test(
     payload: TestRequest,
     current_user: User = Depends(get_current_user),
 ):
-    """Generate MCQ questions for a skill.
-    Returns questions WITHOUT correct answers — user must submit answers to /test/check."""
-    questions = generate_test_questions(payload.skill_name, payload.num_questions)
+    """Generate questions for a skill.
+    Returns questions WITHOUT correct answers."""
+    questions = generate_test_questions(payload.skill_name, payload.num_questions, payload.test_type)
 
-    # Create a unique test ID and store the full questions (with answers) server-side
+    # Create a unique test ID and store metadata and questions server-side
     test_id = str(uuid.uuid4())
-    _active_tests[test_id] = questions
+    _active_tests[test_id] = {
+        "test_type": payload.test_type,
+        "questions": questions
+    }
 
     # Return questions WITHOUT correct_answer or explanation
     questions_out = [
-        QuestionOut(id=i, question=q["question"], options=q["options"])
+        QuestionOut(id=i, question=q["question"], options=q.get("options", []))
         for i, q in enumerate(questions)
     ]
 
@@ -58,7 +65,9 @@ def check_answers(
     if payload.test_id not in _active_tests:
         raise HTTPException(status_code=404, detail="Test not found or already submitted")
 
-    full_questions = _active_tests.pop(payload.test_id)  # remove after checking
+    test_session = _active_tests.pop(payload.test_id)  # remove after checking
+    test_type = test_session.get("test_type", "mcq")
+    full_questions = test_session["questions"]
     total = len(full_questions)
     correct_count = 0
     results = []
@@ -87,6 +96,7 @@ def check_answers(
     test_result = TestResult(
         user_id=current_user.id,
         skill_name=payload.skill_name,
+        test_type=test_type,
         score=score,
     )
     db.add(test_result)
@@ -106,7 +116,54 @@ def check_answers(
     )
 
 
-@router.get("/history", response_model=list[TestResultResponse])
+@router.post("/grade", response_model=SubmitOpenResponse)
+def grade_open_test(
+    payload: SubmitOpenRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Grade open-ended HR or Coding answers using AI."""
+    if payload.test_id not in _active_tests:
+        raise HTTPException(status_code=404, detail="Test session expired or invalid")
+
+    test_session = _active_tests.pop(payload.test_id)
+    test_type = test_session.get("test_type", payload.test_type)
+    full_questions = test_session["questions"]
+
+    # Delegate grading to AI
+    results_raw = ai_grade_open_ended_test(
+        payload.test_type, 
+        full_questions, 
+        [{"question_id": a.question_id, "answer": a.answer} for a in payload.answers]
+    )
+
+    if not results_raw:
+        raise HTTPException(status_code=500, detail="AI grading failed")
+
+    # Map back to schemas
+    results = [OpenResult(**res) for res in results_raw]
+    avg_score = sum(r.score for r in results) / len(results) if results else 0.0
+
+    # Save to DB
+    test_result = TestResult(
+        user_id=current_user.id,
+        skill_name=payload.skill_name,
+        test_type=test_type,
+        score=avg_score,
+    )
+    db.add(test_result)
+    db.commit()
+
+    # Award rewards
+    if avg_score >= 70:
+        add_xp(current_user, XP_PER_TEST, db)
+        update_streak(current_user, db)
+
+    return SubmitOpenResponse(
+        skill_name=payload.skill_name,
+        total_score=avg_score,
+        results=results
+    )
 def get_test_history(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),

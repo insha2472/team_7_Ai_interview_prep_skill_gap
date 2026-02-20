@@ -42,8 +42,23 @@ def update_progress(
 
     progress.completed_skills = json.dumps(payload.completed_skills)
     
-    # In a real app, we'd calculate % based on the roadmap length
-    # For now, we'll just store the list
+    # Calculate progress percentage based on the roadmap length
+    try:
+        from models import GeneratedRoadmap
+        roadmap = db.query(GeneratedRoadmap).filter(GeneratedRoadmap.user_id == current_user.id).order_by(GeneratedRoadmap.id.desc()).first()
+        if roadmap:
+            roadmap_data = json.loads(roadmap.roadmap_data)
+            total_skills = 0
+            for week in roadmap_data:
+                total_skills += len(week.get("skills", []))
+            
+            if total_skills > 0:
+                progress.total_progress_percentage = round((len(payload.completed_skills) / total_skills) * 100, 2)
+            else:
+                progress.total_progress_percentage = 0.0
+    except Exception as e:
+        print(f"[Progress Route] Error calculating percentage: {e}")
+
     db.commit()
     db.refresh(progress)
 

@@ -63,6 +63,7 @@ def get_skill_gap(
         user_id=current_user.id,
         matched_skills=json.dumps(result["matched_skills"]),
         missing_skills=json.dumps(result["missing_skills"]),
+        priority_skills=json.dumps(result.get("priority_skills", [])),
         match_percentage=result["match_percentage"],
     )
     db.add(analysis)
@@ -83,5 +84,6 @@ def get_skill_gap(
         user_id=analysis.user_id,
         matched_skills=result["matched_skills"],
         missing_skills=result["missing_skills"],
+        priority_skills=result.get("priority_skills", []),
         match_percentage=result["match_percentage"],
     )

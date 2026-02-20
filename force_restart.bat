@@ -1,0 +1,6 @@
+@echo off
+echo Killing any process on port 8000...
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr :8000 ^| findstr LISTENING') do taskkill /F /PID %%a
+echo Starting backend server on port 8000...
+cd /d d:\repos\team_7_Ai_interview_prep_skill_gap
+.venv\Scripts\python.exe -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload

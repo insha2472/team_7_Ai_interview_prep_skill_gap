@@ -46,6 +46,13 @@ app.include_router(gamification_router)
 # --------------- Create Tables ---------------
 Base.metadata.create_all(bind=engine)
 
+@app.on_event("startup")
+def run_migrations():
+    from fix_db import fix_schema
+    print("Running startup migrations...")
+    fix_schema()
+    print("Startup migrations completed.")
+
 
 @app.get("/", tags=["Root"])
 def read_root():

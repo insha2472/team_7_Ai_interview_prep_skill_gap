@@ -22,6 +22,7 @@ class QuestionFull(BaseModel):
 class TestRequest(BaseModel):
     skill_name: str
     num_questions: int = 5
+    test_type: str = "mcq"  # mcq, hr, coding
 
 
 class TestGenerateResponse(BaseModel):
@@ -66,10 +67,38 @@ class SubmitAnswerRequest(BaseModel):
     score: float
 
 
+# --- For HR/Coding (Open-ended) ---
+class OpenAnswerItem(BaseModel):
+    question_id: int
+    answer: str
+
+
+class SubmitOpenRequest(BaseModel):
+    test_id: str
+    skill_name: str
+    test_type: str
+    answers: List[OpenAnswerItem]
+
+
+class OpenResult(BaseModel):
+    question_id: int
+    question: str
+    user_answer: str
+    feedback: str
+    score: float # 0 to 100
+
+
+class SubmitOpenResponse(BaseModel):
+    skill_name: str
+    total_score: float
+    results: List[OpenResult]
+
+
 class TestResultResponse(BaseModel):
     id: int
     user_id: int
     skill_name: str
+    test_type: Optional[str] = None
     score: float
     taken_at: datetime
 

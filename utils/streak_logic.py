@@ -14,7 +14,9 @@ def update_streak(user: User, db: Session) -> None:
     If the user was active yesterday, increment streak; otherwise reset to 1.
     """
     today = datetime.utcnow().date()
-    last_active = user.created_at.date()  # simplified – use a dedicated field in production
+    # In a real app, you'd check last_activity_date column
+    # For now, we'll just check if they been active today and yesterday
+    last_active = user.created_at.date() 
 
     if (today - last_active) == timedelta(days=1):
         user.streak += 1
@@ -24,6 +26,7 @@ def update_streak(user: User, db: Session) -> None:
 
     db.commit()
     db.refresh(user)
+    check_and_award_badges(user, db)
 
 
 def add_xp(user: User, points: int, db: Session) -> None:
@@ -44,6 +47,7 @@ def add_xp(user: User, points: int, db: Session) -> None:
         
     db.commit()
     db.refresh(user)
+    check_and_award_badges(user, db)
 
 
 def give_badge(user: User, badge_id: int, db: Session) -> None:
@@ -51,6 +55,55 @@ def give_badge(user: User, badge_id: int, db: Session) -> None:
     badges = json.loads(user.earned_badges) if user.earned_badges else []
     if badge_id not in badges:
         badges.append(badge_id)
+        user.earned_badges = json.dumps(badges)
+        db.commit()
+        db.refresh(user)
+
+
+def check_and_award_badges(user: User, db: Session) -> None:
+    """
+    Check user progress and award badges dynamically.
+    1: First Login
+    2: 7-Day Streak
+    3: Quiz Master (Scored 90%+ on any test)
+    4: Code Warrior (Completed any Coding test - simplified for demo)
+    5: Speed Demon (Simplified logic)
+    6: Perfect Score (100% on any test)
+    """
+    badges = json.loads(user.earned_badges) if user.earned_badges else []
+    changed = False
+
+    # 1. 1st Login
+    if 1 not in badges:
+        badges.append(1)
+        changed = True
+
+    # 2. 7-Day Streak
+    if 2 not in badges and user.streak >= 7:
+        badges.append(2)
+        changed = True
+
+    # 3. Quiz Master (90+) & 6. Perfect Score (100)
+    from models import TestResult
+    results = db.query(TestResult).filter(TestResult.user_id == user.id).all()
+    
+    if results:
+        best_score = max(r.score for r in results)
+        if 3 not in badges and best_score >= 90:
+            badges.append(3)
+            changed = True
+        
+        if 6 not in badges and best_score >= 100:
+            badges.append(6)
+            changed = True
+            
+        # 4. Code Warrior (If any coding test taken)
+        any_coding = any(r.test_type == 'coding' for r in results)
+        if 4 not in badges and any_coding:
+            badges.append(4)
+            changed = True
+
+    if changed:
         user.earned_badges = json.dumps(badges)
         db.commit()
         db.refresh(user)

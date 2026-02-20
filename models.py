@@ -69,6 +69,7 @@ class SkillAnalysis(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     matched_skills = Column(Text, nullable=True)       # stored as JSON string
     missing_skills = Column(Text, nullable=True)        # stored as JSON string
+    priority_skills = Column(Text, nullable=True)       # stored as JSON string
     match_percentage = Column(Float, default=0.0)
 
     user = relationship("User", back_populates="skill_analyses")
@@ -80,6 +81,7 @@ class TestResult(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     skill_name = Column(String(255), nullable=False)
+    test_type = Column(String(50), nullable=True)  # mcq, hr, coding
     score = Column(Float, default=0.0)
     taken_at = Column(DateTime, default=datetime.utcnow)
 
