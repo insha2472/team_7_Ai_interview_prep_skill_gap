@@ -32,6 +32,9 @@ def _ask_gemini_json(prompt: str, retries: int = 2) -> dict | list:
             response = client.models.generate_content(
                 model=MODEL_ID,
                 contents=prompt,
+                config=genai.types.GenerateContentConfig(
+                    response_mime_type="application/json"
+                )
             )
             text = response.text.strip()
 
@@ -55,6 +58,10 @@ def _ask_gemini_json(prompt: str, retries: int = 2) -> dict | list:
                 json_text = text[start_idx:end_idx]
                 return json.loads(json_text)
             
+            # If no brackets found but text is non-empty, try raw load
+            if text:
+                return json.loads(text)
+            
             raise ValueError(f"No JSON found in response: {text[:100]}...")
 
         except Exception as e:
@@ -75,16 +82,24 @@ def ai_analyse_skill_gap(resume_text: str, jd_text: str) -> Dict:
     Use Gemini to extract skills from resume & JD, compare them,
     and return matched_skills, missing_skills, priority_skills, and match_percentage.
     """
-    prompt = f"""You are an expert HR analyst and technical recruiter.
+    prompt = f"""You are an advanced AI Career Analyst.
+    
+TASK: Perform a deep comparison between the provided Resume and Job Description (JD).
 
-TASK: Compare the candidate's resume against the Job Description (JD).
-1. Extract ALL technical and soft skills from the RESUME.
-2. Extract ALL required skills from the JD.
-3. Identify:
-   - "matched_skills": Skills listed in the JD that the candidate ALREADY has in their resume.
-   - "missing_skills": Skills required in the JD that are NOT present (or weak) in the resume.
-   - "priority_skills": Top 3-5 most critical missing skills the candidate should focus on FIRST.
-4. Calculate match_percentage = (matched / total_jd_skills) * 100.
+1. EXTRACT:
+   - All technical skills (languages, frameworks, tools) from the Resume.
+   - All required skills from the JD.
+2. ANALYZE:
+   - "matched_skills": Direct matches or strong equivalents found in both.
+   - "missing_skills": Critical requirements from JD not found in Resume.
+   - "priority_skills": Top 3 most important missing skills to learn first.
+3. CALCULATE:
+   - Match Percentage: A realistic score out of 100 based on core JD requirements.
+
+STRICT RULES:
+- Be unique and personalised for this specific candidate.
+- Ensure the match percentage reflects the actual gap realistically.
+- Return ONLY valid JSON.
 
 RESUME:
 \"\"\"
@@ -96,12 +111,14 @@ JD:
 {jd_text}
 \"\"\"
 
-Return ONLY valid JSON (no markdown):
+[Unique Token: {time.time()}]
+
+JSON Format:
 {{
   "matched_skills": ["...", "..."],
   "missing_skills": ["...", "..."],
   "priority_skills": ["...", "..."],
-  "match_percentage": 75.0
+  "match_percentage": 0.0
 }}"""
     try:
         result = _ask_gemini_json(prompt)
@@ -119,6 +136,7 @@ Return ONLY valid JSON (no markdown):
         return {
             "matched_skills": [],
             "missing_skills": [],
+            "priority_skills": [],
             "match_percentage": 0.0,
         }
 

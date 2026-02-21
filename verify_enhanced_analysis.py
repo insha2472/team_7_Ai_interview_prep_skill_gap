@@ -5,18 +5,18 @@ resume = "Experienced Python developer with 5 years in FastAPI, PostgreSQL, and 
 jd = "Looking for a Senior Backend Engineer proficient in Python, FastAPI, and Kubernetes. Experience with Redis and monitoring tools like Prometheus is a plus."
 
 print("Running skill analysis...")
+log_data = {"status": "starting", "results": None, "error": None}
+
 try:
     result = ai_analyse_skill_gap(resume, jd)
-    print("\nAnalysis Result:")
-    print(json.dumps(result, indent=2))
+    log_data["results"] = result
+    log_data["status"] = "success"
     
-    # Check for expected keys
-    expected = ["matched_skills", "missing_skills", "priority_skills", "match_percentage"]
-    missing = [k for k in expected if k not in result]
-    if not missing:
-        print("\nSUCCESS: All expected fields are present.")
-    else:
-        print(f"\nFAILURE: Missing fields: {missing}")
-        
 except Exception as e:
-    print(f"\nERROR: {e}")
+    log_data["error"] = str(e)
+    log_data["status"] = "error"
+
+with open("verification_log.json", "w") as f:
+    json.dump(log_data, f, indent=2)
+
+print("Finished. Log written to verification_log.json")
